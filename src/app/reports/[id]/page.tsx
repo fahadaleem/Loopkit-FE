@@ -44,6 +44,10 @@ export default function ReportDetailPage() {
     );
   }
 
+  const reportStatus = report?.status;
+  const isFailed = reportStatus === "failed";
+  const isCompleted = reportStatus === "completed";
+
   return (
     <main className="min-h-screen bg-background">
       <header className="border-b border-border bg-surface/70 backdrop-blur">
@@ -58,7 +62,7 @@ export default function ReportDetailPage() {
             LoopKit
           </Link>
           <div className="flex items-center gap-3">
-            {report ? (
+            {report && isCompleted ? (
               <DeleteReportButton
                 reportId={report.id}
                 reportTitle={report.title}
@@ -66,6 +70,12 @@ export default function ReportDetailPage() {
                 onDeleted={() => router.push("/reports")}
               />
             ) : null}
+            <Link
+              href="/reports"
+              className="text-sm font-medium text-muted-foreground hover:text-foreground"
+            >
+              My reports
+            </Link>
             <Link
               href="/"
               className="text-sm font-medium text-muted-foreground hover:text-foreground"
@@ -97,7 +107,18 @@ export default function ReportDetailPage() {
           />
         ) : null}
 
-        {report ? (
+        {reportStatus === "pending" || reportStatus === "processing" ? (
+          <GeneratingState status={reportStatus} />
+        ) : null}
+
+        {report && isFailed ? (
+          <FailedState
+            errorMessage={report.error ?? null}
+            onRetry={refetch}
+          />
+        ) : null}
+
+        {report && isCompleted ? (
           <div className="lg:grid lg:grid-cols-[1fr_220px] lg:gap-10">
             <div className="space-y-8">
               <ReportHeader report={report} />
@@ -169,6 +190,95 @@ export default function ReportDetailPage() {
         ) : null}
       </section>
     </main>
+  );
+}
+
+function GeneratingState({ status }: { status: "pending" | "processing" }) {
+  const isQueued = status === "pending";
+  return (
+    <div className="rounded-2xl border border-border bg-surface px-6 py-12 text-center sm:px-10">
+      <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10">
+        <span className="block size-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      </div>
+
+      <h2 className="mt-5 text-xl font-semibold text-foreground sm:text-2xl">
+        {isQueued ? "Your report is queued" : "Generating your report"}
+      </h2>
+      <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+        {isQueued
+          ? "We've received your inputs and queued the job. It will start in a moment."
+          : "Our AI is analysing your resume against the job description and preparing tailored questions. This usually takes 20–30 seconds."}
+      </p>
+      <p className="mt-3 text-xs text-muted-foreground">
+        You don't have to wait here — feel free to leave this page. We'll
+        keep generating in the background and the report will be ready in your
+        listing.
+      </p>
+
+      <div className="mt-7 flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-3">
+        <Link
+          href="/reports"
+          className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover sm:w-auto"
+        >
+          Go to my reports
+        </Link>
+        <Link
+          href="/reports/new"
+          className="inline-flex w-full items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted sm:w-auto"
+        >
+          Start another report
+        </Link>
+      </div>
+
+      <p
+        className="mt-6 inline-flex items-center gap-2 text-xs text-muted-foreground"
+        aria-live="polite"
+      >
+        <span className="size-1.5 animate-pulse rounded-full bg-primary" />
+        Auto-refreshing every few seconds…
+      </p>
+    </div>
+  );
+}
+
+function FailedState({
+  errorMessage,
+  onRetry,
+}: {
+  errorMessage: string | null;
+  onRetry: () => void;
+}) {
+  return (
+    <div className="rounded-2xl border border-danger/40 bg-danger/5 px-6 py-12 text-center sm:px-10">
+      <h2 className="text-xl font-semibold text-foreground sm:text-2xl">
+        Report generation failed
+      </h2>
+      <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+        {errorMessage ??
+          "Something went wrong while generating this report. You can try generating it again."}
+      </p>
+      <div className="mt-6 flex flex-col items-center justify-center gap-2 sm:flex-row sm:gap-3">
+        <button
+          type="button"
+          onClick={onRetry}
+          className="inline-flex w-full items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted sm:w-auto"
+        >
+          Refresh
+        </button>
+        <Link
+          href="/reports/new"
+          className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover sm:w-auto"
+        >
+          Start a new report
+        </Link>
+        <Link
+          href="/reports"
+          className="inline-flex w-full items-center justify-center rounded-lg border border-border bg-surface px-4 py-2 text-sm font-medium text-foreground transition hover:bg-surface-muted sm:w-auto"
+        >
+          Back to my reports
+        </Link>
+      </div>
+    </div>
   );
 }
 

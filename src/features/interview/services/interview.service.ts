@@ -2,6 +2,8 @@ import { apiFetch, apiFetchBlob } from "@/lib/api";
 
 export type SkillSeverity = "low" | "medium" | "high";
 
+export type ReportStatus = "pending" | "processing" | "completed" | "failed";
+
 export type TechnicalQuestion = {
   question: string;
   intention: string;
@@ -33,19 +35,26 @@ export type AtsResumeSummary = {
 
 export type InterviewReport = {
   id: string;
-  title: string;
-  matchScore: number;
+  title?: string;
+  matchScore?: number;
   jobDescription: string;
   selfDescription?: string;
   resume?: string;
-  technicalQuestions: TechnicalQuestion[];
-  behavioralQuestions: BehavioralQuestion[];
-  skillGaps: SkillGap[];
-  preparationPlan: PreparationDay[];
+  technicalQuestions?: TechnicalQuestion[];
+  behavioralQuestions?: BehavioralQuestion[];
+  skillGaps?: SkillGap[];
+  preparationPlan?: PreparationDay[];
   user: string;
   createdAt?: string;
   updatedAt?: string;
   atsResume?: AtsResumeSummary | null;
+  status: ReportStatus;
+  error?: string | null;
+};
+
+export type QueuedReport = {
+  id: string;
+  status: ReportStatus;
 };
 
 export type InterviewReportSummary = {
@@ -64,7 +73,7 @@ export type ReportsPagination = {
 
 type GenerateReportResponse = {
   message: string;
-  interviewReport: InterviewReport;
+  interviewReport: QueuedReport;
 };
 
 type GetReportResponse = {

@@ -99,12 +99,12 @@ export function ReportForm() {
           disabled={!isValid || isLoading}
           className="w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {isLoading ? "Generating your report…" : "Generate report"}
+          {isLoading ? "Submitting…" : "Generate report"}
         </button>
         <p className="mt-2 text-center text-xs text-muted-foreground">
           {isLoading
-            ? "This can take 20–30 seconds while the AI prepares tailored questions."
-            : "We'll analyse your resume against the JD and produce a tailored prep report."}
+            ? "Queuing your report — you'll be redirected in a moment."
+            : "We'll queue your report and take you to the status page so you don't have to wait here."}
         </p>
       </div>
     </form>
