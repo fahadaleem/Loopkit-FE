@@ -23,6 +23,7 @@ export type ReportsState = {
   error: string | null;
   isLoading: boolean;
   refetch: () => void;
+  removeReport: (id: string) => void;
 };
 
 function getErrorMessage(err: unknown) {
@@ -70,6 +71,16 @@ export function useReports({
 
   const refetch = useCallback(() => setVersion((v) => v + 1), []);
 
+  const removeReport = useCallback((id: string) => {
+    setReports((prev) => prev.filter((r) => r.id !== id));
+    setPagination((prev) => {
+      if (!prev) return prev;
+      const totalReports = Math.max(0, prev.totalReports - 1);
+      const totalPages = Math.max(1, Math.ceil(totalReports / prev.limit));
+      return { ...prev, totalReports, totalPages };
+    });
+  }, []);
+
   return {
     reports,
     pagination,
@@ -77,5 +88,6 @@ export function useReports({
     error,
     isLoading: status === "loading",
     refetch,
+    removeReport,
   };
 }

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { interviewService } from "@/features/interview/services/interview.service";
 
-type Status = "idle" | "loading" | "success" | "error";
+type Status = "idle" | "loading" | "success" | "error" | "queued";
 
 function getErrorMessage(err: unknown) {
   if (err instanceof ApiError) return err.message;
@@ -36,22 +36,34 @@ function triggerBrowserDownload(blob: Blob, filename: string) {
 export function useDownloadAtsResume() {
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [queuedMessage, setQueuedMessage] = useState<string | null>(null);
 
   const download = async ({
     id,
     title,
     onSuccess,
+    onQueued,
   }: {
     id: string;
     title?: string;
     onSuccess?: () => void;
+    onQueued?: () => void;
   }) => {
     setStatus("loading");
     setError(null);
+    setQueuedMessage(null);
     try {
-      const blob = await interviewService.downloadAtsResume(id);
+      const result = await interviewService.downloadAtsResume(id);
+
+      if (result.status === "queued") {
+        setQueuedMessage(result.message);
+        setStatus("queued");
+        onQueued?.();
+        return;
+      }
+
       const filename = `ats-resume-${slugify(title ?? "report")}.pdf`;
-      triggerBrowserDownload(blob, filename);
+      triggerBrowserDownload(result.blob, filename);
       setStatus("success");
       onSuccess?.();
       // Auto-revert the success state so the button returns to default after a moment.
@@ -64,11 +76,20 @@ export function useDownloadAtsResume() {
     }
   };
 
+  const reset = useCallback(() => {
+    setStatus("idle");
+    setError(null);
+    setQueuedMessage(null);
+  }, []);
+
   return {
     download,
+    reset,
     status,
     error,
+    queuedMessage,
     isLoading: status === "loading",
     isSuccess: status === "success",
+    isQueued: status === "queued",
   };
 }

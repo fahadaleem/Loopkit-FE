@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUserStore } from "@/store/userStore";
 import { ReportForm } from "@/features/interview/components/ReportForm";
+import { UsageMeter } from "@/features/usage/components/UsageMeter";
+import { useUsage } from "@/features/usage/hooks/useUsage";
+import { formatResetIn } from "@/features/usage/lib/formatResetIn";
 
 export default function NewReportPage() {
   const router = useRouter();
@@ -16,6 +19,29 @@ export default function NewReportPage() {
   useEffect(() => {
     if (hydrated && !user) router.replace("/login");
   }, [hydrated, user, router]);
+
+  const { usage, isLoading: usageLoading } = useUsage({
+    enabled: hydrated && !!user,
+  });
+
+  const [now, setNow] = useState<number | null>(null);
+  useEffect(() => {
+    setNow(Date.now());
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const resetIn = useMemo(
+    () => (usage && now !== null ? formatResetIn(usage.reset, now) : null),
+    [usage, now],
+  );
+
+  const limitReached = !!usage && usage.remaining <= 0;
+  const disabledReason = limitReached
+    ? resetIn
+      ? `Your daily limit is reached. Resets in ${resetIn}.`
+      : `Your daily limit is reached.`
+    : null;
 
   if (!hydrated || !user) {
     return (
@@ -48,7 +74,7 @@ export default function NewReportPage() {
       </header>
 
       <section className="mx-auto max-w-3xl px-6 py-10">
-        <div className="mb-8">
+        <div className="mb-6">
           <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             New interview report
           </h1>
@@ -59,7 +85,14 @@ export default function NewReportPage() {
           </p>
         </div>
 
-        <ReportForm />
+        <UsageMeter
+          usage={usage}
+          isLoading={usageLoading}
+          resetIn={resetIn}
+          className="mb-6"
+        />
+
+        <ReportForm disabled={limitReached} disabledReason={disabledReason} />
       </section>
     </main>
   );

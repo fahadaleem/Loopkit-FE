@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchBlob } from "@/lib/api";
+import { apiFetch, API_BASE_URL, ApiError } from "@/lib/api";
 
 export type SkillSeverity = "low" | "medium" | "high";
 
@@ -98,6 +98,10 @@ export type GenerateReportInput = {
   selfDescription: string;
 };
 
+export type AtsResumeFetchResult =
+  | { status: "ready"; blob: Blob }
+  | { status: "queued"; message: string };
+
 export const interviewService = {
   generateReport({ resume, jobDescription, selfDescription }: GenerateReportInput) {
     const formData = new FormData();
@@ -135,9 +139,40 @@ export const interviewService = {
     );
   },
 
-  downloadAtsResume(id: string) {
-    return apiFetchBlob(`/api/interview/${encodeURIComponent(id)}/pdf`, {
-      method: "GET",
-    });
+  async downloadAtsResume(id: string): Promise<AtsResumeFetchResult> {
+    const res = await fetch(
+      `${API_BASE_URL}/api/interview/${encodeURIComponent(id)}/pdf`,
+      { method: "GET", credentials: "include" },
+    );
+
+    const contentType = res.headers.get("Content-Type") ?? "";
+
+    if (!res.ok) {
+      let message: string | null = null;
+      if (contentType.includes("application/json")) {
+        try {
+          const data = (await res.json()) as { message?: unknown };
+          if (data && typeof data.message === "string") message = data.message;
+        } catch {
+          // ignore — server didn't return JSON on the error path
+        }
+      }
+      throw new ApiError(
+        message ?? `Request failed with status ${res.status}`,
+        res.status,
+      );
+    }
+
+    // Cold path: the controller enqueued a worker job and returned JSON.
+    if (contentType.includes("application/json")) {
+      const data = (await res.json()) as { message?: string };
+      return {
+        status: "queued",
+        message: data.message ?? "Resume is being generated",
+      };
+    }
+
+    // Cached path: PDF binary.
+    return { status: "ready", blob: await res.blob() };
   },
 };

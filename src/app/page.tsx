@@ -22,7 +22,7 @@ export default function HomePage() {
     if (hydrated && !user) router.replace("/login");
   }, [hydrated, user, router]);
 
-  const { reports, pagination, isLoading, error, refetch } = useReports({
+  const { reports, pagination, isLoading, error, removeReport } = useReports({
     page: 1,
     limit: RECENT_LIMIT,
     enabled: hydrated && !!user,
@@ -154,7 +154,7 @@ export default function HomePage() {
           ) : null}
 
           {!isLoading && !error && reports.length > 0 ? (
-            <ReportsTable reports={reports} onDeleted={refetch} />
+            <ReportsTable reports={reports} onDeleted={removeReport} />
           ) : null}
         </div>
       </section>

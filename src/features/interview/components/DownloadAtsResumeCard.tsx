@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useDownloadAtsResume } from "@/features/interview/hooks/useDownloadAtsResume";
 import type { AtsResumeSummary } from "@/features/interview/services/interview.service";
 import {
@@ -16,6 +17,8 @@ type DownloadAtsResumeCardProps = {
   className?: string;
 };
 
+const QUEUED_POLL_INTERVAL_MS = 5000;
+
 export function DownloadAtsResumeCard({
   reportId,
   reportTitle,
@@ -23,31 +26,80 @@ export function DownloadAtsResumeCard({
   onDownloaded,
   className = "",
 }: DownloadAtsResumeCardProps) {
-  const { download, isLoading, isSuccess, error } = useDownloadAtsResume();
+  const { download, reset, isLoading, isSuccess, isQueued, error, queuedMessage } =
+    useDownloadAtsResume();
   const isCached = !!atsResume;
+
+  const onDownloadedRef = useRef(onDownloaded);
+  useEffect(() => {
+    onDownloadedRef.current = onDownloaded;
+  }, [onDownloaded]);
+
+  // While the worker is generating, poll the parent so the report refetches
+  // and this card flips to the cached/download state once atsResume lands.
+  useEffect(() => {
+    if (!isQueued || isCached) return;
+    const interval = window.setInterval(() => {
+      onDownloadedRef.current?.();
+    }, QUEUED_POLL_INTERVAL_MS);
+    return () => window.clearInterval(interval);
+  }, [isQueued, isCached]);
+
+  // Once the resume is available, drop the queued status so the button
+  // returns to the standard "Download" affordance.
+  useEffect(() => {
+    if (isCached && isQueued) reset();
+  }, [isCached, isQueued, reset]);
 
   const onClick = () => {
     if (isLoading) return;
+    if (isQueued) {
+      onDownloaded?.();
+      return;
+    }
     download({
       id: reportId,
       title: reportTitle,
       onSuccess: onDownloaded,
+      onQueued: onDownloaded,
     });
   };
 
+  const showQueued = isQueued && !isCached;
+
   return (
     <div
-      className={`rounded-xl border p-4 ${isCached ? "border-border bg-surface" : "border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent"} ${className}`}
+      className={`rounded-xl border p-4 ${
+        isCached
+          ? "border-border bg-surface"
+          : showQueued
+            ? "border-primary/30 bg-primary/5"
+            : "border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent"
+      } ${className}`}
     >
       <div className="flex items-start gap-2">
         <span
-          className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md ${isCached ? "bg-surface-muted text-muted-foreground" : "bg-primary/15 text-primary"}`}
+          className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md ${
+            isCached
+              ? "bg-surface-muted text-muted-foreground"
+              : "bg-primary/15 text-primary"
+          }`}
         >
-          {isCached ? <DocumentIcon /> : <SparkleIcon />}
+          {isCached ? (
+            <DocumentIcon />
+          ) : showQueued ? (
+            <Spinner />
+          ) : (
+            <SparkleIcon />
+          )}
         </span>
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-foreground">
-            {isCached ? "ATS resume" : "ATS-friendly resume"}
+            {isCached
+              ? "ATS resume"
+              : showQueued
+                ? "Preparing your ATS resume"
+                : "ATS-friendly resume"}
           </h3>
           {isCached && atsResume ? (
             <p
@@ -56,6 +108,12 @@ export function DownloadAtsResumeCard({
             >
               Generated {formatRelativeDate(atsResume.generatedAt)} ·{" "}
               {formatBytes(atsResume.sizeBytes)}
+            </p>
+          ) : showQueued ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              We're crafting a tailored PDF in the background — this usually
+              takes 20–40 seconds. You can leave this page and come back; we'll
+              update this card automatically when it's ready.
             </p>
           ) : (
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -70,17 +128,26 @@ export function DownloadAtsResumeCard({
         type="button"
         onClick={onClick}
         disabled={isLoading}
-        className="mt-3 flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-70"
+        className={`mt-3 flex w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-70 ${
+          showQueued
+            ? "border border-primary/30 bg-surface text-foreground hover:bg-surface-muted"
+            : "bg-primary text-primary-foreground hover:bg-primary-hover"
+        }`}
       >
         {isLoading ? (
           <>
             <Spinner />
-            <span>{isCached ? "Downloading…" : "Generating…"}</span>
+            <span>{isCached ? "Downloading…" : "Starting…"}</span>
           </>
         ) : isSuccess ? (
           <>
             <CheckIcon />
             <span>Downloaded</span>
+          </>
+        ) : showQueued ? (
+          <>
+            <RefreshIcon />
+            <span>Check status</span>
           </>
         ) : isCached ? (
           <>
@@ -95,12 +162,44 @@ export function DownloadAtsResumeCard({
         )}
       </button>
 
+      {showQueued ? (
+        <p
+          role="status"
+          aria-live="polite"
+          className="mt-2 inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+        >
+          <span className="size-1.5 animate-pulse rounded-full bg-primary" />
+          {queuedMessage ?? "Resume is being generated…"}
+        </p>
+      ) : null}
+
       {error ? (
         <p role="alert" className="mt-2 text-xs text-danger">
           {error}
         </p>
       ) : null}
     </div>
+  );
+}
+
+function RefreshIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polyline points="23 4 23 10 17 10" />
+      <polyline points="1 20 1 14 7 14" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+    </svg>
   );
 }
 

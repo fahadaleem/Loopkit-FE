@@ -32,7 +32,7 @@ function ReportsPageInner() {
   const pageParam = Number(searchParams.get("page") ?? "1");
   const page = Number.isFinite(pageParam) && pageParam > 0 ? pageParam : 1;
 
-  const { reports, pagination, isLoading, error, refetch } = useReports({
+  const { reports, pagination, isLoading, error, removeReport } = useReports({
     page,
     limit: PAGE_SIZE,
     enabled: hydrated && !!user,
@@ -46,11 +46,11 @@ function ReportsPageInner() {
     router.push(qs ? `/reports?${qs}` : "/reports");
   };
 
-  const handleDeleted = () => {
-    // If we just deleted the last row on a page > 1, step back a page;
-    // otherwise refetch the current page.
+  const handleDeleted = (id: string) => {
+    // If we just removed the last row on a page > 1, step back a page;
+    // otherwise update local state in place so the list doesn't flash a skeleton.
     if (page > 1 && reports.length === 1) goToPage(page - 1);
-    else refetch();
+    else removeReport(id);
   };
 
   if (!hydrated || !user) {

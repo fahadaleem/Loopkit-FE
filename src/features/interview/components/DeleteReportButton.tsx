@@ -7,6 +7,7 @@ type DeleteReportButtonProps = {
   reportId: string;
   reportTitle?: string;
   onDeleted?: (id: string) => void;
+  onDeletingChange?: (id: string, deleting: boolean) => void;
   variant?: "icon" | "button";
 };
 
@@ -14,11 +15,16 @@ export function DeleteReportButton({
   reportId,
   reportTitle,
   onDeleted,
+  onDeletingChange,
   variant = "icon",
 }: DeleteReportButtonProps) {
   const [open, setOpen] = useState(false);
   const { deleteReport, isDeleting, error, reset } = useDeleteReport();
   const cancelRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    onDeletingChange?.(reportId, isDeleting);
+  }, [isDeleting, reportId, onDeletingChange]);
 
   useEffect(() => {
     if (!open) return;
